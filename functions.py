@@ -15,20 +15,13 @@ def wet_bulb_temperature(T, RH):
     Tw = term1 + term2 + term3 + term4
     return Tw
 
-def input_space(T, RH, min_af, max_af, min_wf, max_wf, af_step, wf_step):
+def input_space(T, RH, U_default):
     wb_temp=wet_bulb_temperature(T,RH)
-    af_val=np.arange(min_af,max_af+af_step,af_step)
-    af_n_val=af_val.shape[0]
-    wf_val=np.arange(min_wf,max_wf+wf_step,wf_step)
-    wf_n_val=wf_val.shape[0]
     if wb_temp<=-2.5: #la neve può essere prodotta
-        U=np.empty((af_n_val,wf_n_val,2))
-        for i,af in enumerate(af_val):
-            for j,wf in enumerate(wf_val):
-                U[i,j]=[af,wf]
+        return U_default
     else:
-        U=np.array([0,0])
-    return U
+        return np.array([0,0],dtype=np.float32)
+
 
 def load_transition_matrices(filename):
     """
@@ -69,13 +62,45 @@ def snow_produced(T_t,RH_t,af_t,wf_t):
     snow_prod = k * min(af_t,wf_t)
     return snow_prod
 
+"""
 def snow_melted(T_t,RH_t):
-    DDF = 5 #degree day factor (mm/°C/giorno), tipicamente 1-10 mm
+    DDF = 10 #degree day factor (mm/°C/giorno), tipicamente 1-10 mm
     T0 = 0 #°C sopra la quale avviene la fusione della neve, [-1,1] in genere
     A = 10 #metri quadri: superficie occupata dalla neve prodotta
     T_avg = T_t #temperatura media durante il time step
     snow_melt = (DDF/(1000*24)) * max(T_avg-T0,0) * A
     return snow_melt
+"""
+def snow_melted(T_t, RH_t, A=30):
+    """
+    Calcola la neve sciolta in un'ora (in m^3) in base a temperatura e umidità relative.
+    
+    Parametri:
+        T_t : temperatura media dell'ora (°C)
+        RH_t : umidità relativa (0-1 o 0-100)
+        A : area innevata (m^2)
+    """
+    
+    # Converti RH in 0-1 se necessario
+    if RH_t > 1:
+        RH = RH_t / 100
+    else:
+        RH = RH_t
+
+    # Parametri fisici/semiempirici
+    DHF = 10   # mm/°C/ora, tipico range 0.1–0.7 mm/°C/h
+    T0 = 0.0    # temperatura soglia
+    
+    # Fattore di amplificazione dell'umidità
+    humidity_factor = 0.5 + 0.5 * RH   # da 0.5 (secco) a 1.0 (umido)
+    
+    # Degree-hour melt (mm di acqua equivalente)
+    melt_mm = DHF * max(T_t - T0, 0) * humidity_factor
+    
+    # Conversione mm → m³: 1 mm = 1/1000 m
+    melt_volume = (melt_mm / 1000) * A
+    
+    return melt_volume
 
 def state_to_index(T_val, RH_val, temp_vals, humid_vals):
     """
