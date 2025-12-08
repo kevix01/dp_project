@@ -88,14 +88,14 @@ rh_by_fascia   = [np.array(x) for x in rh_by_fascia]
 # stampa del numero di dati utilizzati per la stima dei ciascuna pmf (per fascia)
 print("Per ogni fascia vengono utilizzati "+str(len(temp_by_fascia[0]))+" valori per stimare le pmf di temperatura e umidità.\n")
 #print(temp_by_fascia[8])
-#print(temp_by_fascia[9])
+#tprint(temp_by_fascia[9])
 #-----------------------------------------------------------
 # CALCOLO PMFs PER FASCIA ORARIA e salvataggio su un unico file json
 # Supponiamo di avere già:
 # temp_by_fascia = [...]  # lista di 6 numpy array
 # rh_by_fascia   = [...]  # lista di 6 numpy array
 
-def compute_pmf(arr, bins=50):
+def compute_pmf(arr, bins=30):
     """
     Calcola la PMF di un array utilizzando istogramma normalizzato
     """
@@ -181,7 +181,8 @@ def digitize_values(values, edges):
     """
     Assegna ogni valore al bin corrispondente (indice di stato).
     """
-    idx = np.digitize(values, edges) - 1
+    #idx = np.digitize(values, edges) - 1
+    idx=np.argmin(np.abs(edges[:,None]-values),axis=0)
     idx[idx < 0] = 0
     idx[idx >= len(edges)-1] = len(edges)-2
     return idx
@@ -211,7 +212,7 @@ def compute_transition_matrix(idx_t, idx_tp1, n_states):
 # ---------------------------------------------------------
 # COSTRUZIONE DELLE MATRICI DI TRANSIZIONE PER T E RH
 # ---------------------------------------------------------
-num_bins = 50
+num_bins = 30
 P_T_list = []   # conterrà 23 matrici 50x50
 P_RH_list = []  # conterrà 23 matrici 50x50
 
