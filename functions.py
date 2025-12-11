@@ -1,7 +1,9 @@
 import math
 import numpy as np
 import json
+from numba import njit
 
+@njit
 def wet_bulb_temperature(T, RH):
     """
     Calcola la temperatura di bulbo umido (Tw) dati T (°C) e RH (%)
@@ -15,12 +17,13 @@ def wet_bulb_temperature(T, RH):
     Tw = term1 + term2 + term3 + term4
     return Tw
 
+@njit
 def input_space(T, RH, U_default):
     wb_temp=wet_bulb_temperature(T,RH)
     if wb_temp<=-2.5: #la neve può essere prodotta
         return U_default
     else:
-        return np.array([0,0],dtype=np.float32)
+        return np.array([[0,0]],dtype=np.float32)
 
 
 def load_transition_matrices(filename):
@@ -54,6 +57,7 @@ def build_joint_transition(P_T, P_RH):
         raise RuntimeError("Le righe della matrice congiunta non sommano a 1")
     return P_joint
 
+@njit
 def snow_produced(T_t,RH_t,af_t,wf_t):
     alpha = 0.7 #[0.4,1]
     T_wb_soglia= -2.5 #°C
@@ -71,6 +75,7 @@ def snow_melted(T_t,RH_t):
     snow_melt = (DDF/(1000*24)) * max(T_avg-T0,0) * A
     return snow_melt
 """
+@njit
 def snow_melted(T_t, RH_t, A=30):
     """
     Calcola la neve sciolta in un'ora (in m^3) in base a temperatura e umidità relative.
@@ -102,29 +107,27 @@ def snow_melted(T_t, RH_t, A=30):
     
     return melt_volume
 
+@njit
 def state_to_index(T_val, RH_val, temp_vals, humid_vals):
-    """
-    Converte uno stato (T,RH) in indice per la matrice di transizione congiunta.
+    # Usa searchsorted per trovare l'indice dove il valore DOVREBBE essere
+    i = np.searchsorted(temp_vals, T_val)
+    j = np.searchsorted(humid_vals, RH_val)
     
-    Parameters:
-        T_val : float - valore della temperatura
-        RH_val : float - valore di umidità relativa
-        temp_vals : array_like - array dei valori di temperatura per la fascia
-        humid_vals : array_like - array dei valori di umidità per la fascia
-    
-    Returns:
-        idx : int - indice corrispondente nella matrice P
-    """
-    try:
-        i = np.where(temp_vals == T_val)[0][0]  # indice temperatura
-        j = np.where(humid_vals == RH_val)[0][0]  # indice umidità
-    except IndexError:
-        raise ValueError(f"Valore non presente nello spazio dello stato: T={T_val}, RH={RH_val}")
-    
+    n_T = len(temp_vals)
     n_RH = len(humid_vals)
-    idx = i * n_RH + j
-    return idx
 
+    # Controllo bounds: verifica se l'indice è valido e se il valore corrisponde davvero
+    # (searchsorted restituisce l'indice di inserimento anche se il valore non c'è)
+    if i >= n_T or np.abs(temp_vals[i] - T_val) > 1e-5:
+        return -1 # Temperatura non trovata esattamente
+    
+    if j >= n_RH or np.abs(humid_vals[j] - RH_val) > 1e-5:
+        return -1 # Umidità non trovata esattamente
+
+    return i * n_RH + j
+
+    
+@njit
 def index_to_state(idx, temp_vals, humid_vals):
     """
     Converte un indice della matrice di transizione congiunta nello stato (T,RH).
