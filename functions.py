@@ -18,9 +18,9 @@ def wet_bulb_temperature(T, RH):
     return Tw
 
 @njit
-def input_space(T, RH, U_default):
+def input_space(T, RH, U_default, d, max_d):
     wb_temp=wet_bulb_temperature(T,RH)
-    if wb_temp<=-2.5: #la neve può essere prodotta
+    if wb_temp<=-2.5 and d<max_d: #la neve può essere prodotta
         return U_default
     else:
         return np.array([[0,0]],dtype=np.float32)
