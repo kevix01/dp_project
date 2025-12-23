@@ -59,7 +59,7 @@ def build_joint_transition(P_T, P_RH):
 
 @njit
 def snow_produced(T_t,RH_t,af_t,wf_t):
-    alpha = 0.7 #[0.4,1]
+    alpha = 0.4 #[0.4,1]
     T_wb_soglia= -2.5 #°C
     T_wb = wet_bulb_temperature(T_t,RH_t)
     k = alpha * max(0,T_wb_soglia-T_wb)
@@ -93,7 +93,7 @@ def snow_melted(T_t, RH_t, A=30):
         RH = RH_t
 
     # Parametri fisici/semiempirici
-    DHF = 10   # mm/°C/ora, tipico range 0.1–0.7 mm/°C/h
+    DHF = 0.7   # mm/°C/ora, tipico range 0.1–0.7 mm/°C/h
     T0 = 0.0    # temperatura soglia
     
     # Fattore di amplificazione dell'umidità
