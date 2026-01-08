@@ -66,15 +66,6 @@ def snow_produced(T_t,RH_t,af_t,wf_t):
     snow_prod = k * min(af_t,wf_t)
     return snow_prod
 
-"""
-def snow_melted(T_t,RH_t):
-    DDF = 10 #degree day factor (mm/°C/giorno), tipicamente 1-10 mm
-    T0 = 0 #°C sopra la quale avviene la fusione della neve, [-1,1] in genere
-    A = 10 #metri quadri: superficie occupata dalla neve prodotta
-    T_avg = T_t #temperatura media durante il time step
-    snow_melt = (DDF/(1000*24)) * max(T_avg-T0,0) * A
-    return snow_melt
-"""
 @njit
 def snow_melted(T_t, RH_t, A=30):
     """
