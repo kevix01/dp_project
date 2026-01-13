@@ -7,7 +7,6 @@ from numba import njit
 def wet_bulb_temperature(T, RH):
     """
     Calcola la temperatura di bulbo umido (Tw) dati T (°C) e RH (%)
-    usando la formula approssimata mostrata nell'immagine.
     """
     term1 = T * math.atan(0.151977 * math.sqrt(RH + 8.313659))
     term2 = math.atan(T + RH)
@@ -20,7 +19,9 @@ def wet_bulb_temperature(T, RH):
 @njit
 def input_space(T, RH, U_default, d, max_d):
     wb_temp=wet_bulb_temperature(T,RH)
-    if wb_temp<=-2.5 and d<max_d: #la neve può essere prodotta
+    if wb_temp<=-2.5 and d<max_d: 
+        #la neve può essere prodotta se le condizioni meteo lo permettono 
+        #e se non è stato raggiunto il quantitativo di neve massimo 
         return U_default
     else:
         return np.array([[0,0]],dtype=np.float32)
@@ -50,15 +51,24 @@ def build_joint_transition(P_T, P_RH):
     check_rows_stochastic(P_T, "P_T")
     check_rows_stochastic(P_RH, "P_RH")
     
-    # prodotto di Kronecker (nota: np.kron(A,B) restituisce blocchi A[i,j]*B)
+    # prodotto di Kronecker (np.kron(A,B) restituisce blocchi A[i,j]*B)
     P_joint = np.kron(P_T, P_RH)
-    # opzionale: verifica righe
+    # verifica righe
     if not np.allclose(P_joint.sum(axis=1), 1.0, atol=1e-8):
         raise RuntimeError("Le righe della matrice congiunta non sommano a 1")
     return P_joint
 
 @njit
 def snow_produced(T_t,RH_t,af_t,wf_t):
+    """
+    Calcola la neve prosotta in un'ora (in m^3) in base a temperatura, umidità relativa, flusso di aria e acqua in ingresso allo sparaneve.
+    
+    Parametri:
+        T_t : temperatura dell'ora t (°C)
+        RH_t : umidità relativa (0-100)
+        af_t: flusso di aria (m^3/h)
+        wf_t: flusso di acqua (m^3/h)
+    """
     alpha = 0.4 #[0.4,1]
     T_wb_soglia= -2.5 #°C
     T_wb = wet_bulb_temperature(T_t,RH_t)
@@ -69,15 +79,15 @@ def snow_produced(T_t,RH_t,af_t,wf_t):
 @njit
 def snow_melted(T_t, RH_t, A=30):
     """
-    Calcola la neve sciolta in un'ora (in m^3) in base a temperatura e umidità relative.
+    Calcola la neve fusa in un'ora (in m^3) in base a temperatura e umidità relative.
     
     Parametri:
         T_t : temperatura media dell'ora (°C)
-        RH_t : umidità relativa (0-1 o 0-100)
+        RH_t : umidità relativa (0-100)
         A : area innevata (m^2)
     """
     
-    # Converti RH in 0-1 se necessario
+    # Conversione di RH_t in 0-1 
     if RH_t > 1:
         RH = RH_t / 100
     else:
@@ -100,6 +110,7 @@ def snow_melted(T_t, RH_t, A=30):
 
 @njit
 def state_to_index(T_val, RH_val, temp_vals, humid_vals):
+    """Converte lo stato (T_val,RH_val) nell'indice della matrice di transizione congiunta."""
     # Usa searchsorted per trovare l'indice dove il valore DOVREBBE essere
     i = np.searchsorted(temp_vals, T_val)
     j = np.searchsorted(humid_vals, RH_val)
