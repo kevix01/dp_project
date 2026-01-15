@@ -61,7 +61,7 @@ def build_joint_transition(P_T, P_RH):
 @njit
 def snow_produced(T_t,RH_t,af_t,wf_t):
     """
-    Calcola la neve prosotta in un'ora (in m^3) in base a temperatura, umidità relativa, flusso di aria e acqua in ingresso allo sparaneve.
+    Calcola la neve prodotta in un'ora (in m^3) in base a temperatura, umidità relativa, flusso di aria e acqua in ingresso allo sparaneve.
     
     Parametri:
         T_t : temperatura dell'ora t (°C)

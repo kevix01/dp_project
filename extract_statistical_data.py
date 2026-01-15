@@ -5,12 +5,12 @@ import glob
 import os
 import json
 
-# bool variable to enable the plot of the pmfs di umidità e temperatura per fascia
+# bool variable per abilitare i plot of the pmfs di umidità e temperatura per fascia
 print("Digita: True per abilitare i plot | False per disabilitarli.")
 string=input(">>")
 plot_enabled=True if string=="True" else False
 
-# LETTURA FILEs CSV Caples Lake, 9 nodi
+# LETTURA FILEs CSV Caples Lake, 9 nodi (sensori)
 # CREAZIONE DI UN DATAFRAME PER OGNI NODO,
 # filtrando i dati per data e selezionando solo le colonne temperatura e umidità
 # SALVATAGGIO su 9 FILEs csv i dati filtrati
@@ -54,9 +54,6 @@ for node_idx, file in enumerate(sorted(glob.glob(path + "*.csv"))):
 
     print(f"Salvato: {csv_file}")
 
-    #selezione di sensori specifici da cui estrarre dati
-    #if(node_idx==0): break
-
 #--------------------------------------------------------------
 # DIVISIONE DEI DATI di tutti i sensori PER FASCIA ORARIA,
 # salvataggio dati temp e RH su liste di numpy arrays, uno per ogni fascia
@@ -87,26 +84,18 @@ rh_by_fascia   = [np.array(x) for x in rh_by_fascia]
 
 # stampa del numero di dati utilizzati per la stima dei ciascuna pmf (per fascia)
 print("Per ogni fascia vengono utilizzati "+str(len(temp_by_fascia[0]))+" valori per stimare le pmf di temperatura e umidità.\n")
-#print(temp_by_fascia[8])
-#tprint(temp_by_fascia[9])
+
 #-----------------------------------------------------------
 # CALCOLO PMFs PER FASCIA ORARIA e salvataggio su un unico file json
-# Supponiamo di avere già:
-# temp_by_fascia = [...]  # lista di 6 numpy array
-# rh_by_fascia   = [...]  # lista di 6 numpy array
 
 def compute_pmf(arr, bins=30):
     """
     Calcola la PMF di un array utilizzando istogramma normalizzato
     """
-    #print("Max:",np.max(arr))
-    #print("Min:",np.min(arr))
     counts, bin_edges = np.histogram(arr, bins=bins, density=True)
     # valori al centro dei bin
     values = (bin_edges[:-1] + bin_edges[1:]) / 2
     pmf = counts / counts.sum()  # normalizza a 1
-    #print(values)
-    #print(pmf)
     return values, pmf
 
 # Dizionari per salvare le PMF
@@ -117,7 +106,6 @@ rh_vals_by_fascia = []
 
 # Ciclo sulle  fasce orarie
 for i in range(num_fasce):
-    #if(i%6==0):
     fascia_label = f"{(i*durata_fascia):02d}:00-{(i*durata_fascia+durata_fascia-1):02d}:59"
     # Temperatura
     temp_vals, temp_pmf = compute_pmf(temp_by_fascia[i])
@@ -167,21 +155,13 @@ print("PMF salvate in pmf_temperature.json e pmf_humidity.json")
 
 
 #------------------------------------------------------------------------------
-#CALCOLO MATRICI DELLE PROBABILITA' CONDIZIONATE PER TEMPERATURA E UMIDITA'
-
-def compute_bins(values, num_bins=50):
-    """
-    Calcola i bin (edges e centrali) per la discretizzazione.
-    """
-    counts, edges = np.histogram(values, bins=num_bins)
-    centers = (edges[:-1] + edges[1:]) / 2
-    return edges, centers
+# FUNZIONI PER IL CALCOLO DELLE MATRICI DELLE PROBABILITA' CONDIZIONATE PER TEMPERATURA E UMIDITA'
 
 def digitize_values(values, edges):
     """
     Assegna ogni valore al bin corrispondente (indice di stato).
     """
-    #idx = np.digitize(values, edges) - 1
+    # assegnazione del valore esatto al discreto più vicino
     idx=np.argmin(np.abs(edges[:,None]-values),axis=0)
     idx[idx < 0] = 0
     idx[idx >= len(edges)-1] = len(edges)-2
@@ -213,19 +193,12 @@ def compute_transition_matrix(idx_t, idx_tp1, n_states):
 # COSTRUZIONE DELLE MATRICI DI TRANSIZIONE PER T E RH
 # ---------------------------------------------------------
 num_bins = 30
-P_T_list = []   # conterrà 23 matrici 50x50
-P_RH_list = []  # conterrà 23 matrici 50x50
+P_T_list = []   # conterrà 24 matrici 30x30
+P_RH_list = []  # conterrà 24 matrici 30x30
 
 for f in range(num_fasce):
 
     # --- TEMPERATURA ---
-
-    # unisci i dati di fascia f e f+1 per costruire bin coerenti
-    """
-    T_concat = np.concatenate([temp_by_fascia[f], temp_by_fascia[f+1]])
-    T_edges, T_states = compute_bins(T_concat, num_bins)
-    """
-
     T_edges_f_curr = temp_vals_by_fascia[f] #valori discreti temperatura fascia corrente
     if f<23:
         T_edges_f_next = temp_vals_by_fascia[f+1] #valori discreti temperatura fascia successiva
@@ -242,11 +215,6 @@ for f in range(num_fasce):
     P_T_list.append(P_T)
 
     # --- UMIDITÀ ---
-    """
-    RH_concat = np.concatenate([rh_by_fascia[f], rh_by_fascia[f+1]])
-    RH_edges, RH_states = compute_bins(RH_concat, num_bins)
-    """
-
     RH_edges_f_curr = rh_vals_by_fascia[f] #valori discreti temperatura fascia corrente
     if f<23:
         RH_edges_f_next = rh_vals_by_fascia[f+1] #valori discreti temperatura fascia successiva
@@ -262,12 +230,8 @@ for f in range(num_fasce):
     P_RH = compute_transition_matrix(idx_RH_t, idx_RH_tp1, num_bins)
     P_RH_list.append(P_RH)
 
-print("Calcolate", len(P_T_list), "matrici di transizione per la Temperatura (50x50)")
-print("Calcolate", len(P_RH_list), "matrici di transizione per l'Umidità (50x50)")
-
-#np.set_printoptions(threshold=np.inf)
-
-print(P_T_list[23])
+print("Calcolate", len(P_T_list), "matrici di transizione per la Temperatura (30x30)")
+print("Calcolate", len(P_RH_list), "matrici di transizione per l'Umidità (30x30)")
 
 # -----------------------------------------------------
 # SALVATAGGIO DELLE MATRICI DI TRANSIZIONE IN JSON
